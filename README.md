@@ -2,13 +2,17 @@
 
 [![CI](https://github.com/YeshwanthUdayshankar/psirt-agent-engine/actions/workflows/ci.yml/badge.svg)](https://github.com/YeshwanthUdayshankar/psirt-agent-engine/actions/workflows/ci.yml)
 
-An open-source, multi-agent Product Security Incident Response (PSIRT) & Vulnerability Response Engine built with **Zero-Trust Separation of Duties**, **Read-Only Tree-sitter AST MCP Tools**, **CVE Program CNA Counting Rules**, **CISA KEV/EPSS Threat Intel**, **Deterministic Guardrails**, and **Mandatory Human-in-the-Loop (HITL) Approval Gates**.
+An open-source, multi-agent Product Security Incident Response (PSIRT) & Vulnerability Response Engine built with **Zero-Trust Separation of Duties**, **Read-Only Tree-sitter AST MCP Tools**, **CVE Program CNA Counting Rules**, **CISA KEV/EPSS Threat Intel**, **Jira Schema-Drift & `CODEOWNERS` Routing**, **Deterministic Guardrails**, and **Mandatory Human-in-the-Loop (HITL) Approval Gates**.
+
+> **Looking for the full deep-dive?** See the **[Detailed Features, Architecture & Setup Guide](docs/DETAILED_GUIDE.md)** for complete CLI references, LLM/Ollama/vLLM/ZDR configuration, MCP server integration, Jira mapping, CNA policy rules, and GitHub Actions HITL setup.
+
+---
 
 ## Why This Exists
 
-- **High Noise-to-Signal Ratio:** Dependency scanners flag every transitive CVE regardless of reachability. `psirt-agent-engine` uses Tree-sitter AST call-graph analysis to separate reachable (`affected`) from unreachable (`not_affected`) CVEs with verifiable code citations and standardized OpenVEX justifications.
-- **Manual PSIRT Overhead:** Automatically drafts root-cause MITRE CWE mappings, environmental **CVSS v4.0** assessments, **MITRE ATT&CK** mappings, tiered remediations (**Track A** patch/upgrade + **Track B** compensating controls + `pytest` reproducer), and standards-compliant **OpenVEX v0.2.0**, **OASIS CSAF 2.0** (`csaf_vex` & `csaf_security_advisory`), **CVE JSON 5.1**, and Markdown security advisories.
-- **Trust & Hallucination Risk:** No LLM output reaches human reviewers—let alone external publication—without passing deterministic JSON Schema validation, SBOM version/PURL cross-checks, CVSS v4.0 math recalculation, zero-leakage secret scanning, and explicit signed human sign-off.
+- **High Noise-to-Signal Ratio:** Dependency scanners flag every transitive CVE regardless of reachability. `psirt-agent-engine` uses Tree-sitter AST call-graph analysis (with monorepo sub-service scoping) to separate reachable (`affected`) from unreachable (`not_affected`) CVEs with verifiable code citations and standardized OpenVEX justifications.
+- **Manual PSIRT & CNA Overhead:** Automatically enforces CVE Program CNA rules (`on_prem` vs. `hybrid` vs. `saas`), maps root-cause MITRE CWEs, calculates environmental **CVSS v4.0** scores, enriches with **CISA KEV / FIRST EPSS** and **MITRE ATT&CK**, drafts tiered remediations (**Track A** patch/upgrade + **Track B** compensating controls + runnable `pytest` reproducer), routes tickets via `CODEOWNERS` into division-specific Jira schemas, and exports **OpenVEX v0.2.0**, **OASIS CSAF 2.0** (`csaf_vex` & `csaf_security_advisory`), **CVE JSON 5.1**, and Markdown bulletins.
+- **Trust & Hallucination Risk:** No LLM output reaches human reviewers—let alone external publication—without passing 8 deterministic guardrail gates (JSON Schema, CSAF profile integrity, SBOM version/PURL cross-checks, CVSS v4.0 math recalculation, logical version ordering, CNA policy, public prose hygiene, and zero-leakage secret scanning) plus explicit signed human sign-off.
 
 ---
 
@@ -21,25 +25,26 @@ An open-source, multi-agent Product Security Incident Response (PSIRT) & Vulnera
 ┌─────────────────────────────────────────────────────────────────────────┐
 │ LAYER 1: DETERMINISTIC INTAKE & SANITIZATION (Zero LLM Involvement)     │
 │  • Syft (SBOM) + Grype/OSV-Scanner (CVEs) + Semgrep (SAST) + Gitleaks   │
-│    (plus built-in deterministic fallbacks & scanner JSON import)        │
-│  • Secret/PII Redactor (strips credentials before any LLM sees context) │
+│    (plus built-in deterministic fallbacks & --scanner-report JSON)      │
+│  • Secret/PII Redactor + Repo-Wide Prompt Injection Scanner             │
 │  • Canonical Normalizer & Deduplicator -> Consolidated TriageCase[]     │
 └──────────────────────────────────┬──────────────────────────────────────┘
                                    │ (Untrusted code wrapped in XML fences)
                                    ▼
 ┌─────────────────────────────────────────────────────────────────────────┐
 │ LAYER 2: AGENTIC ANALYSIS GRAPH (Read-Only MCP Tool Access)             │
-│  • Triage & Scoring Agent (CWE + Environmental CVSS v4.0 + ATT&CK)      │
+│  • CODEOWNERS Router + Triage Agent (CWE + CVSS v4.0 + KEV/EPSS + ATT&CK)│
 │  • VEX Reachability Agent (Tree-sitter AST MCP -> affected/not_affected)│
+│  • CNA Rules Engine (on_prem / hybrid / saas -> CVE assignment policy)  │
 │  • Remediation Agent (Track A patch/bump + Track B controls + pytest)   │
 │  • Advisory Drafting Agent (OpenVEX, CSAF 2.0, CVE JSON 5.1, Markdown)  │
 └──────────────────────────────────┬──────────────────────────────────────┘
                                    ▼
 ┌─────────────────────────────────────────────────────────────────────────┐
-│ LAYER 3: DETERMINISTIC GUARDRAILS & VALIDATION GATE                     │
-│  • JSON Schema Check (OpenVEX v0.2.0, OASIS CSAF 2.0, CVE JSON 5.1)     │
-│  • Cross-Artifact Consistency (Versions/PURL/CVE/CWE match SBOM)        │
-│  • Deterministic CVSS v4.0 Math Recalculation & Secret Leak Scan        │
+│ LAYER 3: DETERMINISTIC GUARDRAILS & VALIDATION GATE (8 Gates)           │
+│  • JSON Schema + OASIS CSAF Profile Rules (OpenVEX, CSAF 2.0, CVE 5.1)  │
+│  • SBOM Version/PURL Alignment, Logical Version Order (fixed > affected)│
+│  • CVSS v4.0 Math Recalculation, CNA Policy, Prose Hygiene & Leak Scan  │
 │  • [FAIL] -> Retry loop (max 2 retries) or flag NEEDS_MANUAL_TRIAGE     │
 └──────────────────────────────────┬──────────────────────────────────────┘
                                    ▼
@@ -49,7 +54,7 @@ An open-source, multi-agent Product Security Incident Response (PSIRT) & Vulnera
 │  • Interactive Rich TUI review or GitHub Actions Environment Gate       │
 │  • Human overrides re-trigger Layer 3 guardrails automatically          │
 │  • Signed approval writes hash-chained decision_audit.yaml & unlocks    │
-│    deterministic export (.vex.json, .csaf.json, .cve5.json, ADVISORY.md)│
+│    export (.vex.json, .csaf.json, .cve5.json, ADVISORY.md, jira_tickets)│
 └─────────────────────────────────────────────────────────────────────────┘
 ```
 
@@ -73,16 +78,18 @@ Optional: install external deterministic scanners (`syft`, `grype`, `osv-scanner
 bash scripts/install-tools.sh
 ```
 
-> The engine works out-of-the-box even without external binaries installed by falling back to built-in CycloneDX SBOM, CVE, SAST, and secret scanners, or by ingesting pre-generated scanner JSON reports via `--scanner-report`.
+> Works out-of-the-box offline with built-in CycloneDX SBOM, CVE, SAST, and secret scanners, or by importing pre-generated scanner JSON reports (`--scanner-report`).
 
 ### 2. Run Locally (Interactive CLI + HITL Gate)
 
 ```bash
 # Step 1: Scan & triage target repo — halts automatically at 6_AWAITING_HUMAN_REVIEW
-# Supports --deployment-mode on_prem | hybrid | saas (enforces CVE Program CNA SaaS rules)
-psirt-engine scan tests/fixtures/sample_python_app --profile ollama_local --deployment-mode on_prem
+# Supports --deployment-mode on_prem | hybrid | saas (enforces CVE Program CNA rules)
+psirt-engine scan tests/fixtures/sample_python_app \
+  --profile ollama_local \
+  --deployment-mode on_prem
 
-# Step 2: Check status & metrics (Noise Reduction Rate, Schema Pass Rate, Redactions)
+# Step 2: Inspect checkpointed status & metrics
 psirt-engine status
 
 # Step 3: Interactive Rich TUI review (inspect citations/diffs, override VEX, approve)
@@ -92,47 +99,54 @@ psirt-engine review --reviewer psirt-engineer
 psirt-engine approve --reviewer psirt-engineer --export
 ```
 
-### 3. Model-Agnostic / Privacy Configuration (`config/models.yaml`)
-
-- **`ollama_local` (default):** Connects to local Ollama (`http://127.0.0.1:11434`) with automatic fallback to deterministic offline heuristics if Ollama is unreachable.
-- **`vllm_local`:** Connects to a self-hosted vLLM OpenAI-compatible endpoint.
-- **`anthropic_zdr` / `openai_zdr`:** Enterprise Zero-Data-Retention API endpoints.
-- **`offline_heuristic`:** 100% offline deterministic execution for air-gapped environments and CI tests.
-
-### 4. Read-Only MCP Servers
-
-Both MCP servers expose strictly read-only tools (zero file write, shell execution, or outbound mutation capabilities):
+### 3. Run Tests, Lint & Golden-Dataset Benchmark
 
 ```bash
-# Repository Tree-sitter AST & sanitized file reader MCP server
-PSIRT_TARGET_REPO=./tests/fixtures/sample_python_app psirt-mcp-repo-ast
-
-# Vulnerability Intelligence (CWE / MITRE ATT&CK / CISA KEV / EPSS / VEX / OSV) MCP server
-psirt-mcp-vuln-intel
-```
-
-### 5. Enterprise PSIRT Governance Features
-
-- **CNA Assignment Rules (`--deployment-mode on_prem|hybrid|saas`):** Enforces CVE Program Section 7 rules — references upstream CVEs for third-party deps, excludes vendor-managed multi-tenant SaaS flaws requiring zero customer action, and splits first-party on-prem/hybrid root causes into schema-valid CVE JSON 5.1 drafts.
-- **CISA KEV & FIRST EPSS Enrichment:** Layers exploitation likelihood and active-exploitation status (`emergency_kev` / `elevated_epss` / `standard`) alongside environmental CVSS v4.0.
-- **Jira Schema-Drift Adapter & `CODEOWNERS` Routing (`config/jira_mapping.yaml`):** Automatically resolves owning teams from `CODEOWNERS`, maps canonical cases into division-specific Jira custom field IDs with deterministic idempotency keys, exports `jira_tickets.json` dry-run payloads, and supports HTTP `429` exponential backoff.
-- **`Advisory-Ready` Hygiene Guardrails:** Deterministically verifies `fixed_version > affected_version`, blocks internal URLs/hostnames (`jira.internal`, `localhost`, `/tmp/...`) from leaking into public advisories, and enforces CNA policy compliance before HITL sign-off.
-
-### 6. Run Tests & Golden-Dataset Evaluation Benchmark
-
-```bash
+ruff check src tests scripts
 pytest -v
 python scripts/run_eval.py
 ```
 
 ---
 
+## Core Enterprise PSIRT Features
+
+| Capability | Implementation |
+|---|---|
+| **CNA Assignment Rules** | [cna_rules.py](src/psirt_engine/agents/cna_rules.py) — Enforces CVE Program Section 7 rules across `--deployment-mode on_prem\|hybrid\|saas` (`assign_new_cve`, `reference_upstream_cve`, `no_cve_saas_excluded`, `no_cve_not_affected`, `no_cve_secret_hygiene`) |
+| **CISA KEV & FIRST EPSS** | [vuln_intel_server.py](src/psirt_engine/mcp_servers/vuln_intel_server.py) — Read-only `lookup_kev_epss` MCP tool assigning `emergency_kev`, `elevated_epss`, or `standard` priority tiers alongside CVSS v4.0 |
+| **Jira Schema-Drift & `CODEOWNERS`** | [jira_adapter.py](src/psirt_engine/hitl/jira_adapter.py) + [config/jira_mapping.yaml](config/jira_mapping.yaml) — Routes via `CODEOWNERS`, maps division-specific Jira custom field IDs, generates deterministic SHA-256 idempotency keys, exports `jira_tickets.json`, and handles HTTP `429` exponential backoff |
+| **Read-Only AST & Intel MCP Servers** | `psirt-mcp-repo-ast` (Tree-sitter Python/Go call graphs, path jail, redacted reads) & `psirt-mcp-vuln-intel` (CWE, ATT&CK, KEV/EPSS, VEX, OSV) — zero write/shell/mutation tools |
+| **`Advisory-Ready` Guardrails (8 Gates)** | [consistency.py](src/psirt_engine/guardrails/consistency.py) — Schema validation, CSAF profile rules, SBOM version/PURL check, CVSS v4.0 math, `fixed_version > affected_version`, CNA policy enforcement, internal URL/path hygiene check, and secret leak blocking |
+| **Model-Agnostic / ZDR Privacy** | [config/models.yaml](config/models.yaml) — Local `ollama_local` (default), `vllm_local`, `anthropic_zdr`, `openai_zdr`, and air-gapped `offline_heuristic` |
+
+See **[docs/DETAILED_GUIDE.md](docs/DETAILED_GUIDE.md)** for full architecture walkthroughs, MCP client config, and CI/CD setup.
+
+---
+
+## Golden-Dataset Evaluation Metrics (`python scripts/run_eval.py`)
+
+Verified in CI ([.github/workflows/ci.yml](.github/workflows/ci.yml)) against [eval/golden_dataset.yaml](eval/golden_dataset.yaml) across Python (`on_prem` & `saas`) and Go fixtures:
+
+| Metric | Result | Target / Gate |
+|---|---|---|
+| **VEX Reachability Precision / Recall / F1** | **100.0% / 100.0% / 100.0%** (`tp=7, fp=0, fn=0, tn=4`) | `100.0%` |
+| **CWE Root-Cause Accuracy** | **100.0%** | `100.0%` |
+| **CNA Rule Accuracy (`on_prem` vs. `saas` vs. 3rd-party)** | **100.0%** | `100.0%` |
+| **CISA KEV Detection Accuracy** | **100.0%** | `100.0%` |
+| **Avg Dependency Noise Reduction Rate** | **66.7%** | Maximize |
+| **Deterministic Schema Pass Rate** | **100.0%** (OpenVEX, CSAF 2.0, CVE JSON 5.1) | `100.0%` |
+| **Zero-Leakage Secret Leaks** | **0** | `0` |
+| **Avg Human Edit Distance** | **0.0018** | Minimize |
+
+---
+
 ## Sample Outputs (Verified on [OWASP PyGoat](https://github.com/adeyosemanputra/pygoat))
 
-Below are actual outputs captured from running `psirt-agent-engine` against OWASP PyGoat (commit `2aa4cc14f251`):
+Actual outputs captured from running `psirt-agent-engine` against OWASP PyGoat (commit `2aa4cc14f251`):
 
 - **39 raw findings → 36 consolidated cases** (`28` hardcoded secrets redacted, **0 secret leaks** in exported bundle)
-- **50.0% dependency Noise Reduction Rate** (`4/8` third-party CVEs triaged `not_affected` via Tree-sitter AST scoping)
+- **50.0% dependency Noise Reduction Rate** (`4/8` third-party CVEs triaged `not_affected` via Tree-sitter AST monorepo scoping)
 - **100.0% JSON Schema Pass Rate** across `108` published JSON artifacts (`37` OpenVEX, `36` CSAF 2.0 VEX, `32` CSAF 2.0 Advisory, `3` CVE JSON 5.1)
 - **179 hash-chained audit events** verified intact in `decision_audit.yaml`
 
@@ -161,7 +175,7 @@ Below are actual outputs captured from running `psirt-agent-engine` against OWAS
 | `PSIRT-008-E2D2B4` | `CVE-2023-45803` (`CWE-200`) | `urllib3@1.26.9` | `2.3` (LOW) | `not_affected` | `[]` (never imported directly) |
 | `PSIRT-009-10706F` | Unsafe `yaml.load` (`CWE-502`) | first-party | `9.3` (CRITICAL) | `affected` | `dockerized_labs/a9_uckv_lab/app.py:62:yaml.load` |
 
-### 2. Post-Approval Exported Artifacts
+### 2. Post-Approval Exported Bundle
 
 Running `psirt-engine export` prior to approval is blocked by FR-5.1 (`exit 2`). After `psirt-engine approve --reviewer psirt-lead --export`, the engine publishes the validated disclosure bundle:
 
@@ -169,6 +183,7 @@ Running `psirt-engine export` prior to approval is blocked by FR-5.1 (`exit 2`).
 output/
 ├── sbom.cdx.json                     # CycloneDX 1.5 SBOM
 ├── bundle.vex.json                   # Merged OpenVEX v0.2.0 statements
+├── jira_tickets.json                 # Team-mapped Jira payloads with idempotency keys
 ├── decision_audit.yaml               # SHA-256 hash-chained immutable audit trail
 ├── decision_audit.json
 └── psirt-003-8aca4e/
@@ -217,15 +232,18 @@ output/
 </details>
 
 <details>
-<summary><strong>Sample Customer-Facing Security Advisory (<code>ADVISORY.md</code> — Track A + Track B + MITRE ATT&amp;CK)</strong></summary>
+<summary><strong>Sample Customer-Facing Security Advisory (<code>ADVISORY.md</code> — Track A + Track B + KEV/EPSS + ATT&amp;CK)</strong></summary>
 
 ````markdown
 # Security Advisory: EXSA-PSIRT-003-8ACA4E — Pillow ImageMath.eval arbitrary code execution
 
 - **Publisher:** Example Product Security Incident Response Team (PSIRT)
 - **Case ID:** `PSIRT-003-8ACA4E` | **CVE ID:** `CVE-2023-50447`
+- **CNA Decision:** `reference_upstream_cve` (`on_prem`)
+- **Owning Team (CODEOWNERS):** `@appsec-backend`
 - **Root-Cause CWE:** `CWE-94` — Improper Control of Generation of Code ('Code Injection')
 - **VEX Status:** `affected` | **Confidence Score:** 0.88
+- **Threat Intel (KEV / EPSS):** CISA KEV: **NO** | EPSS: `0.412 (p92)` | Tier: `standard`
 
 ## 1. Executive Summary
 Confirmed reachable: package pillow@8.0.0 is imported and vulnerable symbol(s) ['ImageMath.eval']
@@ -335,6 +353,31 @@ Upgrade pillow from 8.0.0 to 10.3.0 in dockerized_labs/a9_uckv_lab/requirements.
 </details>
 
 <details>
+<summary><strong>Sample Schema-Drift-Mapped Jira Payload (<code>jira_tickets.json</code>)</strong></summary>
+
+```json
+{
+  "idempotency_key": "psirt-idem-8f3c1e74c2a1b49d0e52f1a8",
+  "case_id": "PSIRT-006-D604C5",
+  "owning_team": "@appsec-backend",
+  "project_key": "APPAPI",
+  "fields": {
+    "project": { "key": "APPAPI" },
+    "issuetype": { "name": "Bug" },
+    "summary": "[PSIRT-006-D604C5] CWE-89: SQL Injection via unsanitized string interpolation in SQL query",
+    "priority": { "name": "High" },
+    "labels": ["psirt-automated", "vex-affected", "cna-assign_new_cve"],
+    "customfield_10202": "CWE-89",
+    "customfield_20101": 8.8,
+    "customfield_20102": "affected",
+    "customfield_20199": "psirt-idem-8f3c1e74c2a1b49d0e52f1a8"
+  }
+}
+```
+
+</details>
+
+<details>
 <summary><strong>Sample Immutable Hash-Chained Audit Log (<code>decision_audit.yaml</code>)</strong></summary>
 
 ```yaml
@@ -365,13 +408,6 @@ events:
 
 ---
 
-## Governance & Evaluation Metrics
+## Documentation
 
-Every run computes and records the PRD evaluation metrics in the immutable, SHA-256 hash-chained `decision_audit.yaml`:
-
-| Metric | Guarantee / Measurement |
-|---|---|
-| **Noise Reduction Rate** | % of third-party dependency CVEs deterministically triaged as `not_affected` with Tree-sitter AST code citations |
-| **Schema Pass Rate** | 100% deterministic JSON Schema validation pass rate across OpenVEX v0.2.0, OASIS CSAF 2.0, and CVE JSON 5.1 prior to human review |
-| **Zero-Leakage Guarantee** | 100% deterministic redaction of secrets/PII before LLM invocation AND verified again in Layer 3 Guardrails & Layer 4 Publisher |
-| **Immutable Audit Trail** | Tamper-evident SHA-256 hash-chained event log recording scanner inputs, agent traces, human overrides, artifact hashes, and reviewer sign-offs |
+- **[Detailed Features, Architecture & Setup Guide](docs/DETAILED_GUIDE.md)** — In-depth technical documentation covering every layer, CNA rules, MCP servers, Jira integration, guardrails, LLM profiles, CLI flags, CI/CD setup, and evaluation benchmarks.
