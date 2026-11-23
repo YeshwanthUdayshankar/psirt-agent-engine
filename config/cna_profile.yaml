@@ -1,0 +1,27 @@
+# Organization CNA (CVE Numbering Authority) & PSIRT Disclosure Profile
+
+organization:
+  name: "Example Product Security Incident Response Team (PSIRT)"
+  short_name: "example-psirt"
+  # RFC 4122 UUID identifying the CNA organization (replace with assigned MITRE CNA orgId)
+  cna_org_id: "550e8400-e29b-41d4-a716-446655440000"
+  namespace: "https://security.example.com"
+  advisory_base_url: "https://security.example.com/advisories"
+  contact_email: "psirt@example.com"
+  publisher_category: "vendor"
+  csaf_tlp: "WHITE"
+
+advisory_id_prefix: "EXSA"
+cve_id_placeholder_year: 2026
+
+severity_slas_days:
+  CRITICAL: 7
+  HIGH: 30
+  MEDIUM: 90
+  LOW: 180
+
+governance:
+  require_human_approval: true
+  max_guardrail_retries: 2
+  min_confidence_for_auto_vex_draft: 0.70
+  block_on_secret_leak: true

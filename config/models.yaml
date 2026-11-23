@@ -1,0 +1,58 @@
+# LLM Provider Configuration for Agentic PSIRT & Vulnerability Response Engine
+# Supports local self-hosted models (Ollama / vLLM) and Enterprise Zero-Data-Retention (ZDR) APIs.
+# Set PSIRT_LLM_PROFILE env var or pass --profile on the CLI to switch profiles.
+
+default_profile: ollama_local
+
+profiles:
+  ollama_local:
+    provider: ollama
+    base_url: "http://127.0.0.1:11434"
+    model: "qwen2.5-coder:14b"
+    temperature: 0.0
+    timeout_seconds: 120
+    zero_data_retention: true
+    fallback_to_heuristic: true
+
+  vllm_local:
+    provider: openai_compatible
+    base_url: "http://127.0.0.1:8000/v1"
+    api_key_env: "VLLM_API_KEY"
+    model: "Qwen/Qwen2.5-Coder-32B-Instruct"
+    temperature: 0.0
+    timeout_seconds: 120
+    zero_data_retention: true
+    fallback_to_heuristic: true
+
+  anthropic_zdr:
+    provider: anthropic
+    base_url: "https://api.anthropic.com"
+    api_key_env: "ANTHROPIC_API_KEY"
+    model: "claude-sonnet-4-20250514"
+    temperature: 0.0
+    timeout_seconds: 120
+    zero_data_retention: true
+    fallback_to_heuristic: false
+
+  openai_zdr:
+    provider: openai_compatible
+    base_url: "https://api.openai.com/v1"
+    api_key_env: "OPENAI_API_KEY"
+    model: "gpt-4o"
+    temperature: 0.0
+    timeout_seconds: 120
+    zero_data_retention: true
+    fallback_to_heuristic: false
+
+  offline_heuristic:
+    provider: heuristic
+    model: "deterministic-psirt-heuristic-v1"
+    temperature: 0.0
+    timeout_seconds: 10
+    zero_data_retention: true
+    fallback_to_heuristic: true
+
+observability:
+  # Optional local Langfuse tracing (e.g. /data/projects/local-hub/langfuse)
+  langfuse_enabled: false
+  langfuse_base_url_env: "LANGFUSE_BASE_URL"

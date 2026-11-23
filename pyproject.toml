@@ -1,0 +1,62 @@
+[build-system]
+requires = ["hatchling>=1.25.0"]
+build-backend = "hatchling.build"
+
+[project]
+name = "psirt-agent-engine"
+version = "0.1.0"
+description = "Agentic PSIRT & Vulnerability Response Engine with Deterministic Guardrails and Mandatory HITL Governance"
+readme = "README.md"
+license = { text = "Apache-2.0" }
+requires-python = ">=3.11"
+authors = [
+  { name = "PSIRT Engine Contributors" }
+]
+dependencies = [
+  "langgraph>=0.2.60",
+  "langgraph-checkpoint-sqlite>=2.0.0",
+  "pydantic>=2.9.0",
+  "pydantic-settings>=2.6.0",
+  "mcp>=1.2.0",
+  "cvss>=3.3",
+  "jsonschema>=4.23.0",
+  "typer>=0.12.5",
+  "rich>=13.9.0",
+  "pyyaml>=6.0.2",
+  "httpx>=0.27.2",
+  "tree-sitter>=0.23.0",
+  "tree-sitter-python>=0.23.0",
+  "tree-sitter-go>=0.23.0",
+]
+
+[project.optional-dependencies]
+dev = [
+  "pytest>=8.3.0",
+  "pytest-asyncio>=0.24.0",
+  "ruff>=0.7.0",
+]
+observability = [
+  "langfuse>=2.50.0",
+]
+
+[project.scripts]
+psirt-engine = "psirt_engine.cli:app"
+psirt-mcp-repo-ast = "psirt_engine.mcp_servers.repo_ast_server:main"
+psirt-mcp-vuln-intel = "psirt_engine.mcp_servers.vuln_intel_server:main"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/psirt_engine"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+extend-exclude = ["tests/fixtures"]
+
+[tool.ruff.lint.per-file-ignores]
+"src/psirt_engine/cli.py" = ["B008"]

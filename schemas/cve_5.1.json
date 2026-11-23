@@ -1,0 +1,221 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://cveproject.github.io/cve-schema/schema/docs/CVE_Record_Format_5.1.0.json",
+  "title": "CVE JSON Record Format 5.1",
+  "description": "Strict schema for CVE JSON 5.1 CNA container records including native CVSS v4.0 metrics.",
+  "type": "object",
+  "required": ["dataType", "dataVersion", "cveMetadata", "containers"],
+  "additionalProperties": false,
+  "properties": {
+    "dataType": {
+      "type": "string",
+      "const": "CVE_RECORD"
+    },
+    "dataVersion": {
+      "type": "string",
+      "const": "5.1"
+    },
+    "cveMetadata": {
+      "type": "object",
+      "required": ["cveId", "assignerOrgId", "state"],
+      "additionalProperties": false,
+      "properties": {
+        "cveId": {
+          "type": "string",
+          "pattern": "^CVE-[0-9]{4}-[0-9]{4,}$"
+        },
+        "assignerOrgId": {
+          "type": "string",
+          "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$"
+        },
+        "assignerShortName": { "type": "string", "minLength": 1, "maxLength": 32 },
+        "state": { "type": "string", "enum": ["PUBLISHED", "REJECTED"] },
+        "dateReserved": { "type": "string", "format": "date-time" },
+        "datePublished": { "type": "string", "format": "date-time" },
+        "dateUpdated": { "type": "string", "format": "date-time" },
+        "serial": { "type": "integer", "minimum": 1 }
+      }
+    },
+    "containers": {
+      "type": "object",
+      "required": ["cna"],
+      "additionalProperties": false,
+      "properties": {
+        "cna": {
+          "type": "object",
+          "required": ["providerMetadata", "descriptions", "affected", "references"],
+          "additionalProperties": false,
+          "properties": {
+            "providerMetadata": {
+              "type": "object",
+              "required": ["orgId"],
+              "additionalProperties": false,
+              "properties": {
+                "orgId": {
+                  "type": "string",
+                  "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$"
+                },
+                "shortName": { "type": "string", "minLength": 1, "maxLength": 32 },
+                "dateUpdated": { "type": "string", "format": "date-time" }
+              }
+            },
+            "title": { "type": "string", "minLength": 1, "maxLength": 256 },
+            "datePublic": { "type": "string", "format": "date-time" },
+            "descriptions": {
+              "type": "array",
+              "minItems": 1,
+              "items": {
+                "type": "object",
+                "required": ["lang", "value"],
+                "properties": {
+                  "lang": { "type": "string", "minLength": 2 },
+                  "value": { "type": "string", "minLength": 1 }
+                }
+              }
+            },
+            "affected": {
+              "type": "array",
+              "minItems": 1,
+              "items": {
+                "type": "object",
+                "required": ["vendor", "product", "versions"],
+                "properties": {
+                  "vendor": { "type": "string", "minLength": 1 },
+                  "product": { "type": "string", "minLength": 1 },
+                  "packageName": { "type": "string" },
+                  "collectionURL": { "type": "string", "format": "uri" },
+                  "repo": { "type": "string", "format": "uri" },
+                  "defaultStatus": { "type": "string", "enum": ["affected", "unaffected", "unknown"] },
+                  "versions": {
+                    "type": "array",
+                    "minItems": 1,
+                    "items": {
+                      "type": "object",
+                      "required": ["version", "status"],
+                      "properties": {
+                        "version": { "type": "string", "minLength": 1 },
+                        "status": { "type": "string", "enum": ["affected", "unaffected", "unknown"] },
+                        "lessThan": { "type": "string" },
+                        "lessThanOrEqual": { "type": "string" },
+                        "versionType": { "type": "string" }
+                      }
+                    }
+                  }
+                }
+              }
+            },
+            "problemTypes": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "required": ["descriptions"],
+                "properties": {
+                  "descriptions": {
+                    "type": "array",
+                    "minItems": 1,
+                    "items": {
+                      "type": "object",
+                      "required": ["lang", "description"],
+                      "properties": {
+                        "lang": { "type": "string" },
+                        "description": { "type": "string", "minLength": 1 },
+                        "cweId": { "type": "string", "pattern": "^CWE-[1-9]\\d*$" },
+                        "type": { "type": "string" }
+                      }
+                    }
+                  }
+                }
+              }
+            },
+            "metrics": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "format": { "type": "string" },
+                  "scenarios": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "required": ["lang", "value"],
+                      "properties": {
+                        "lang": { "type": "string" },
+                        "value": { "type": "string" }
+                      }
+                    }
+                  },
+                  "cvssV4_0": {
+                    "type": "object",
+                    "required": ["version", "vectorString", "baseScore", "baseSeverity"],
+                    "properties": {
+                      "version": { "type": "string", "const": "4.0" },
+                      "vectorString": { "type": "string", "pattern": "^CVSS:4\\.0/" },
+                      "baseScore": { "type": "number", "minimum": 0, "maximum": 10 },
+                      "baseSeverity": { "type": "string", "enum": ["NONE", "LOW", "MEDIUM", "HIGH", "CRITICAL"] },
+                      "attackVector": { "type": "string" },
+                      "attackComplexity": { "type": "string" },
+                      "attackRequirements": { "type": "string" },
+                      "privilegesRequired": { "type": "string" },
+                      "userInteraction": { "type": "string" },
+                      "vulnConfidentialityImpact": { "type": "string" },
+                      "vulnIntegrityImpact": { "type": "string" },
+                      "vulnAvailabilityImpact": { "type": "string" },
+                      "subConfidentialityImpact": { "type": "string" },
+                      "subIntegrityImpact": { "type": "string" },
+                      "subAvailabilityImpact": { "type": "string" }
+                    }
+                  }
+                }
+              }
+            },
+            "workarounds": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "required": ["lang", "value"],
+                "properties": {
+                  "lang": { "type": "string" },
+                  "value": { "type": "string", "minLength": 1 }
+                }
+              }
+            },
+            "solutions": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "required": ["lang", "value"],
+                "properties": {
+                  "lang": { "type": "string" },
+                  "value": { "type": "string", "minLength": 1 }
+                }
+              }
+            },
+            "references": {
+              "type": "array",
+              "minItems": 1,
+              "items": {
+                "type": "object",
+                "required": ["url"],
+                "properties": {
+                  "url": { "type": "string", "format": "uri" },
+                  "name": { "type": "string" },
+                  "tags": { "type": "array", "items": { "type": "string" } }
+                }
+              }
+            },
+            "x_generator": {
+              "type": "object",
+              "properties": {
+                "engine": { "type": "string" }
+              }
+            }
+          }
+        },
+        "adp": {
+          "type": "array",
+          "items": { "type": "object" }
+        }
+      }
+    }
+  }
+}

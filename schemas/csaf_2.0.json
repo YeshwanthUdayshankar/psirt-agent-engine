@@ -1,0 +1,357 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://docs.oasis-open.org/csaf/csaf/v2.0/csaf_json_schema.json",
+  "title": "OASIS Common Security Advisory Framework (CSAF) v2.0",
+  "description": "Strict schema validating OASIS CSAF 2.0 csaf_vex and csaf_security_advisory profiles.",
+  "type": "object",
+  "required": ["document"],
+  "additionalProperties": false,
+  "properties": {
+    "document": {
+      "type": "object",
+      "required": ["category", "csaf_version", "publisher", "title", "tracking"],
+      "additionalProperties": false,
+      "properties": {
+        "acknowledgments": { "type": "array", "items": { "type": "object" } },
+        "aggregate_severity": {
+          "type": "object",
+          "required": ["text"],
+          "properties": {
+            "namespace": { "type": "string", "format": "uri" },
+            "text": { "type": "string", "minLength": 1 }
+          }
+        },
+        "category": {
+          "type": "string",
+          "enum": [
+            "csaf_base",
+            "csaf_security_incident_response",
+            "csaf_informational_advisory",
+            "csaf_security_advisory",
+            "csaf_vex"
+          ]
+        },
+        "csaf_version": { "type": "string", "const": "2.0" },
+        "distribution": {
+          "type": "object",
+          "properties": {
+            "text": { "type": "string" },
+            "tlp": {
+              "type": "object",
+              "required": ["label"],
+              "properties": {
+                "label": { "type": "string", "enum": ["AMBER", "GREEN", "RED", "WHITE"] },
+                "url": { "type": "string", "format": "uri" }
+              }
+            }
+          }
+        },
+        "lang": { "type": "string" },
+        "notes": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "$ref": "#/$defs/note" }
+        },
+        "publisher": {
+          "type": "object",
+          "required": ["category", "name", "namespace"],
+          "additionalProperties": false,
+          "properties": {
+            "category": {
+              "type": "string",
+              "enum": ["coordinator", "discoverer", "other", "translator", "user", "vendor"]
+            },
+            "contact_details": { "type": "string" },
+            "issuing_authority": { "type": "string" },
+            "name": { "type": "string", "minLength": 1 },
+            "namespace": { "type": "string", "format": "uri" }
+          }
+        },
+        "references": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/reference" }
+        },
+        "title": { "type": "string", "minLength": 1 },
+        "tracking": {
+          "type": "object",
+          "required": ["current_release_date", "id", "initial_release_date", "revision_history", "status", "version"],
+          "additionalProperties": false,
+          "properties": {
+            "aliases": { "type": "array", "items": { "type": "string" } },
+            "current_release_date": { "type": "string", "format": "date-time" },
+            "generator": {
+              "type": "object",
+              "required": ["engine"],
+              "properties": {
+                "date": { "type": "string", "format": "date-time" },
+                "engine": {
+                  "type": "object",
+                  "required": ["name"],
+                  "properties": {
+                    "name": { "type": "string", "minLength": 1 },
+                    "version": { "type": "string" }
+                  }
+                }
+              }
+            },
+            "id": { "type": "string", "minLength": 1 },
+            "initial_release_date": { "type": "string", "format": "date-time" },
+            "revision_history": {
+              "type": "array",
+              "minItems": 1,
+              "items": {
+                "type": "object",
+                "required": ["date", "number", "summary"],
+                "properties": {
+                  "date": { "type": "string", "format": "date-time" },
+                  "legacy_version": { "type": "string" },
+                  "number": { "type": "string", "pattern": "^(0|[1-9][0-9]*)$|^(0|[1-9]\\d*)\\.(0|[1-9]\\d*)\\.(0|[1-9]\\d*)" },
+                  "summary": { "type": "string", "minLength": 1 }
+                }
+              }
+            },
+            "status": { "type": "string", "enum": ["draft", "final", "interim"] },
+            "version": { "type": "string", "pattern": "^(0|[1-9][0-9]*)$|^(0|[1-9]\\d*)\\.(0|[1-9]\\d*)\\.(0|[1-9]\\d*)" }
+          }
+        }
+      }
+    },
+    "product_tree": {
+      "type": "object",
+      "properties": {
+        "branches": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/branch" }
+        },
+        "full_product_names": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/full_product_name" }
+        },
+        "product_groups": { "type": "array", "items": { "type": "object" } },
+        "relationships": { "type": "array", "items": { "type": "object" } }
+      }
+    },
+    "vulnerabilities": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/vulnerability" }
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "document": {
+            "properties": { "category": { "enum": ["csaf_vex", "csaf_security_advisory"] } }
+          }
+        }
+      },
+      "then": {
+        "required": ["product_tree", "vulnerabilities"]
+      }
+    }
+  ],
+  "$defs": {
+    "note": {
+      "type": "object",
+      "required": ["category", "text"],
+      "additionalProperties": false,
+      "properties": {
+        "audience": { "type": "string" },
+        "category": {
+          "type": "string",
+          "enum": ["description", "details", "faq", "general", "legal_disclaimer", "other", "summary"]
+        },
+        "text": { "type": "string", "minLength": 1 },
+        "title": { "type": "string" }
+      }
+    },
+    "reference": {
+      "type": "object",
+      "required": ["summary", "url"],
+      "additionalProperties": false,
+      "properties": {
+        "category": { "type": "string", "enum": ["external", "self"] },
+        "summary": { "type": "string", "minLength": 1 },
+        "url": { "type": "string", "format": "uri" }
+      }
+    },
+    "full_product_name": {
+      "type": "object",
+      "required": ["name", "product_id"],
+      "additionalProperties": false,
+      "properties": {
+        "name": { "type": "string", "minLength": 1 },
+        "product_id": { "type": "string", "minLength": 1 },
+        "product_identification_helper": {
+          "type": "object",
+          "properties": {
+            "cpe": { "type": "string" },
+            "purl": { "type": "string" },
+            "hashes": { "type": "array", "items": { "type": "object" } }
+          }
+        }
+      }
+    },
+    "branch": {
+      "type": "object",
+      "required": ["category", "name"],
+      "properties": {
+        "category": {
+          "type": "string",
+          "enum": [
+            "architecture", "host_name", "language", "legacy", "patch_level",
+            "product_family", "product_name", "product_version",
+            "product_version_range", "service_pack", "specification", "vendor"
+          ]
+        },
+        "name": { "type": "string", "minLength": 1 },
+        "branches": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/branch" }
+        },
+        "product": { "$ref": "#/$defs/full_product_name" }
+      }
+    },
+    "vulnerability": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "acknowledgments": { "type": "array", "items": { "type": "object" } },
+        "cve": { "type": "string", "pattern": "^CVE-[0-9]{4}-[0-9]{4,}$" },
+        "cwe": {
+          "type": "object",
+          "required": ["id", "name"],
+          "additionalProperties": false,
+          "properties": {
+            "id": { "type": "string", "pattern": "^CWE-[1-9]\\d{0,5}$" },
+            "name": { "type": "string", "minLength": 1 }
+          }
+        },
+        "discovery_date": { "type": "string", "format": "date-time" },
+        "flags": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["label", "product_ids"],
+            "additionalProperties": false,
+            "properties": {
+              "date": { "type": "string", "format": "date-time" },
+              "group_ids": { "type": "array", "items": { "type": "string" } },
+              "label": {
+                "type": "string",
+                "enum": [
+                  "component_not_present",
+                  "inline_mitigations_already_exist",
+                  "vulnerable_code_cannot_be_controlled_by_adversary",
+                  "vulnerable_code_not_in_execute_path",
+                  "vulnerable_code_not_present"
+                ]
+              },
+              "product_ids": {
+                "type": "array",
+                "minItems": 1,
+                "items": { "type": "string", "minLength": 1 }
+              }
+            }
+          }
+        },
+        "ids": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["system_name", "text"],
+            "properties": {
+              "system_name": { "type": "string", "minLength": 1 },
+              "text": { "type": "string", "minLength": 1 }
+            }
+          }
+        },
+        "notes": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/note" }
+        },
+        "product_status": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "first_affected": { "type": "array", "items": { "type": "string" } },
+            "first_fixed": { "type": "array", "items": { "type": "string" } },
+            "fixed": { "type": "array", "items": { "type": "string" } },
+            "known_affected": { "type": "array", "items": { "type": "string" } },
+            "known_not_affected": { "type": "array", "items": { "type": "string" } },
+            "last_affected": { "type": "array", "items": { "type": "string" } },
+            "recommended": { "type": "array", "items": { "type": "string" } },
+            "under_investigation": { "type": "array", "items": { "type": "string" } }
+          }
+        },
+        "references": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/reference" }
+        },
+        "release_date": { "type": "string", "format": "date-time" },
+        "remediations": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["category", "details"],
+            "additionalProperties": false,
+            "properties": {
+              "category": {
+                "type": "string",
+                "enum": ["mitigation", "no_fix_planned", "none_available", "vendor_fix", "workaround"]
+              },
+              "date": { "type": "string", "format": "date-time" },
+              "details": { "type": "string", "minLength": 1 },
+              "entitlements": { "type": "array", "items": { "type": "string" } },
+              "group_ids": { "type": "array", "items": { "type": "string" } },
+              "product_ids": { "type": "array", "items": { "type": "string" } },
+              "restart_required": { "type": "object" },
+              "url": { "type": "string", "format": "uri" }
+            }
+          }
+        },
+        "scores": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["products"],
+            "properties": {
+              "products": {
+                "type": "array",
+                "minItems": 1,
+                "items": { "type": "string" }
+              },
+              "cvss_v3": {
+                "type": "object",
+                "required": ["version", "vectorString", "baseScore", "baseSeverity"],
+                "properties": {
+                  "version": { "type": "string", "enum": ["3.0", "3.1"] },
+                  "vectorString": { "type": "string" },
+                  "baseScore": { "type": "number", "minimum": 0, "maximum": 10 },
+                  "baseSeverity": { "type": "string", "enum": ["NONE", "LOW", "MEDIUM", "HIGH", "CRITICAL"] }
+                }
+              }
+            }
+          }
+        },
+        "threats": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["category", "details"],
+            "additionalProperties": false,
+            "properties": {
+              "category": { "type": "string", "enum": ["exploit_status", "impact", "target_set"] },
+              "date": { "type": "string", "format": "date-time" },
+              "details": { "type": "string", "minLength": 1 },
+              "group_ids": { "type": "array", "items": { "type": "string" } },
+              "product_ids": { "type": "array", "items": { "type": "string" } }
+            }
+          }
+        },
+        "title": { "type": "string", "minLength": 1 }
+      }
+    }
+  }
+}

@@ -1,0 +1,108 @@
+name: PSIRT Agentic Triage & HITL Disclosure
+
+on:
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      llm_profile:
+        description: "LLM profile from config/models.yaml"
+        required: false
+        default: "offline_heuristic"
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  # Stage 1-5: Deterministic Intake, Read-Only Agent Triage, Guardrails -> HALT at HITL Gate
+  psirt-triage-and-guardrails:
+    runs-on: ubuntu-latest
+    outputs:
+      run_id: ${{ steps.triage.outputs.run_id }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install psirt-agent-engine
+        run: pip install -e .
+
+      - name: Run Layer 1-3 Pipeline (Halts at 6_AWAITING_HUMAN_REVIEW)
+        id: triage
+        env:
+          PSIRT_LLM_PROFILE: ${{ inputs.llm_profile || 'offline_heuristic' }}
+        run: |
+          RUN_ID="ci-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          echo "run_id=${RUN_ID}" >> "${GITHUB_OUTPUT}"
+          psirt-engine scan . \
+            --profile "${PSIRT_LLM_PROFILE}" \
+            --run-id "${RUN_ID}" \
+            --state-dir .psirt-state \
+            --output-dir psirt-output \
+            --pr-comment-out .psirt-state/pr_comment.md
+
+      - name: Upload Checkpointed SQLite State & Review Summary
+        uses: actions/upload-artifact@v4
+        with:
+          name: psirt-hitl-checkpoint-${{ steps.triage.outputs.run_id }}
+          path: .psirt-state/
+          retention-days: 14
+
+      - name: Post HITL Review Summary to Pull Request
+        if: github.event_name == 'pull_request' && hashFiles('.psirt-state/pr_comment.md') != ''
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const body = fs.readFileSync('.psirt-state/pr_comment.md', 'utf8');
+            await github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body
+            });
+
+  # Stage 6-7: Mandatory Human-in-the-Loop Approval via GitHub Environment Protection Rule
+  psirt-hitl-approve-and-publish:
+    needs: psirt-triage-and-guardrails
+    runs-on: ubuntu-latest
+    # Configure required reviewers on the 'psirt-disclosure-approval' Environment in GitHub Settings
+    environment: psirt-disclosure-approval
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install psirt-agent-engine
+        run: pip install -e .
+
+      - name: Download Checkpointed HITL State
+        uses: actions/download-artifact@v4
+        with:
+          name: psirt-hitl-checkpoint-${{ needs.psirt-triage-and-guardrails.outputs.run_id }}
+          path: .psirt-state/
+
+      - name: Record Signed PSIRT Approval & Export Validated Disclosure Bundle
+        run: |
+          psirt-engine approve \
+            --run-id "${{ needs.psirt-triage-and-guardrails.outputs.run_id }}" \
+            --state-dir .psirt-state \
+            --reviewer "${{ github.actor }}" \
+            --notes "Approved via GitHub Environment Protection Gate (${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID})" \
+            --export
+
+      - name: Upload Validated PSIRT Disclosure Bundle (OpenVEX, CSAF 2.0, CVE 5.1, Audit Log)
+        uses: actions/upload-artifact@v4
+        with:
+          name: psirt-published-bundle-${{ needs.psirt-triage-and-guardrails.outputs.run_id }}
+          path: psirt-output/
+          retention-days: 90
