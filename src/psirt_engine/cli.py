@@ -59,6 +59,7 @@ def _resolve_run_id(state_dir: Path, run_id: str | None) -> str:
 def _run_scan_pipeline(
     repo: Path,
     profile: str,
+    deployment_mode: str,
     state_dir: Path,
     output_dir: Path,
     run_id: str | None,
@@ -76,6 +77,7 @@ def _run_scan_pipeline(
             "run_id": rid,
             "repo_path": str(repo.resolve()),
             "model_profile": profile,
+            "deployment_mode": deployment_mode,
             "output_dir": str(output_dir.resolve()),
             "extra_scanner_reports": [str(p.resolve()) for p in scanner_reports],
             "prefer_builtin_scanners": prefer_builtin,
@@ -123,6 +125,12 @@ def _run_scan_pipeline(
 def scan(
     repo: Path = typer.Argument(..., exists=True, file_okay=False, help="Target Git repository path"),
     profile: str = typer.Option("ollama_local", "--profile", "-p", help="LLM profile from config/models.yaml"),
+    deployment_mode: str = typer.Option(
+        "on_prem",
+        "--deployment-mode",
+        "-d",
+        help="Target deployment model for CNA rules: on_prem | hybrid | saas",
+    ),
     state_dir: Path = typer.Option(Path(".psirt-state"), "--state-dir", help="Checkpoint SQLite directory"),
     output_dir: Path = typer.Option(Path("./psirt-output"), "--output-dir", "-o", help="Export bundle directory"),
     run_id: str | None = typer.Option(None, "--run-id", help="Optional deterministic run/thread ID"),
@@ -140,6 +148,7 @@ def scan(
     _run_scan_pipeline(
         repo=repo,
         profile=profile,
+        deployment_mode=deployment_mode,
         state_dir=state_dir,
         output_dir=output_dir,
         run_id=run_id,
@@ -153,6 +162,9 @@ def scan(
 def triage(
     repo: Path = typer.Argument(..., exists=True, file_okay=False, help="Target Git repository path"),
     profile: str = typer.Option("ollama_local", "--profile", "-p", help="LLM profile"),
+    deployment_mode: str = typer.Option(
+        "on_prem", "--deployment-mode", "-d", help="CNA deployment mode: on_prem | hybrid | saas"
+    ),
     state_dir: Path = typer.Option(Path(".psirt-state"), "--state-dir", help="Checkpoint directory"),
     output_dir: Path = typer.Option(Path("./psirt-output"), "--output-dir", "-o", help="Export directory"),
     run_id: str | None = typer.Option(None, "--run-id", help="Optional run ID"),
@@ -162,6 +174,7 @@ def triage(
     _run_scan_pipeline(
         repo=repo,
         profile=profile,
+        deployment_mode=deployment_mode,
         state_dir=state_dir,
         output_dir=output_dir,
         run_id=run_id,

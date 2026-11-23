@@ -12,6 +12,7 @@ import subprocess
 from pathlib import Path
 from typing import Any
 
+from psirt_engine.hitl.jira_adapter import build_jira_ticket_payload
 from psirt_engine.intake.sanitizer import scan_for_secret_leaks
 from psirt_engine.models.audit import DecisionAuditLog
 from psirt_engine.models.canonical import TriageCase
@@ -27,6 +28,7 @@ def publish_approved_bundle(
     output_dir: Path,
     sbom: dict[str, Any] | None = None,
     open_github_pr: bool = False,
+    run_id: str | None = None,
 ) -> list[str]:
     """Export all approved, guardrail-validated PSIRT disclosure artifacts and immutable audit log."""
     unapproved = [c.case_id for c in cases if not c.human_approved or not c.human_reviewer]
@@ -126,6 +128,14 @@ def publish_approved_bundle(
         merged_path = out / "bundle.vex.json"
         merged_path.write_text(json.dumps(merged_vex, indent=2), encoding="utf-8")
         written.append(str(merged_path))
+
+    # Export schema-drift-mapped Jira payloads (dry-run ready with deterministic idempotency keys)
+    effective_run_id = run_id or audit_log.run_id
+    jira_payloads = [build_jira_ticket_payload(c, run_id=effective_run_id) for c in cases]
+    if jira_payloads:
+        jira_path = out / "jira_tickets.json"
+        jira_path.write_text(json.dumps(jira_payloads, indent=2), encoding="utf-8")
+        written.append(str(jira_path))
 
     # Record publication event and write immutable decision_audit.yaml + .json
     audit_log.append_event(

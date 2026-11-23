@@ -11,6 +11,7 @@ from psirt_engine.config import CNAProfileConfig
 from psirt_engine.guardrails.cvss_math import build_cve5_cvss4_object
 from psirt_engine.intake.sanitizer import redact_secrets_and_pii
 from psirt_engine.models.canonical import (
+    CNADecision,
     DraftArtifacts,
     FindingCategory,
     GuardrailIssue,
@@ -386,15 +387,33 @@ def build_advisory_markdown(
         else ""
     )
     advisory_id = f"{cna.advisory_id_prefix}-{case.case_id}"
+    cna_line = (
+        f"`{case.cna.decision.value}` ({case.cna.deployment_mode.value})"
+        if case.cna
+        else "standard"
+    )
+    kev_epss_line = "N/A"
+    if case.threat_intel:
+        kev_str = f"YES (added {case.threat_intel.kev_date_added})" if case.threat_intel.in_cisa_kev else "NO"
+        epss_str = (
+            f"{case.threat_intel.epss_score:.3f} (p{int((case.threat_intel.epss_percentile or 0) * 100)})"
+            if case.threat_intel.epss_score is not None
+            else "N/A"
+        )
+        kev_epss_line = f"CISA KEV: **{kev_str}** | EPSS: `{epss_str}` | Tier: `{case.threat_intel.priority_tier}`"
+
     lines = [
         f"# Security Advisory: {advisory_id} — {_safe_text(case.title)}",
         "",
         f"- **Publisher:** {cna.organization.name}",
         f"- **Published (Draft):** {now}",
         f"- **Case ID:** `{case.case_id}`",
-        f"- **CVE ID:** `{case.primary_cve_id or 'Pending CNA Assignment'}`",
+        f"- **CVE ID:** `{case.primary_cve_id or ('Not Applicable (' + case.cna.decision.value + ')' if case.cna and case.cna.decision != CNADecision.ASSIGN_NEW_CVE else 'Pending CNA Assignment')}`",
+        f"- **CNA Decision:** {cna_line}",
+        f"- **Owning Team (CODEOWNERS):** `{case.owning_team or 'unassigned'}`",
         f"- **Root-Cause CWE:** `{case.cwe_id or 'Unclassified'}` — {case.cwe_name or ''}",
         f"- **VEX Status:** `{status}`{just}",
+        f"- **Threat Intel (KEV / EPSS):** {kev_epss_line}",
         f"- **Confidence Score:** {case.confidence:.2f}",
         "",
         "## 1. Executive Summary",
@@ -494,10 +513,17 @@ def run_advisory_agent(
         if status == VEXStatus.AFFECTED
         else None
     )
+    should_draft_cve5 = (
+        case.cna.decision == CNADecision.ASSIGN_NEW_CVE
+        if case.cna is not None
+        else (
+            status == VEXStatus.AFFECTED
+            and case.category in (FindingCategory.FIRST_PARTY_SAST, FindingCategory.IAC)
+        )
+    )
     cve_json_5_1 = (
         build_cve_json_5_1(case, cna, repo_name, now)
-        if status == VEXStatus.AFFECTED
-        and case.category in (FindingCategory.FIRST_PARTY_SAST, FindingCategory.IAC)
+        if should_draft_cve5
         else None
     )
     advisory_md = build_advisory_markdown(case, cna, repo_name, now)

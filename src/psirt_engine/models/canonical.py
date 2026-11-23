@@ -33,6 +33,35 @@ class VEXJustification(str, Enum):
     INLINE_MITIGATIONS_ALREADY_EXIST = "inline_mitigations_already_exist"
 
 
+class DeploymentMode(str, Enum):
+    ON_PREM = "on_prem"
+    HYBRID = "hybrid"
+    SAAS = "saas"
+
+
+class CNADecision(str, Enum):
+    ASSIGN_NEW_CVE = "assign_new_cve"
+    REFERENCE_UPSTREAM_CVE = "reference_upstream_cve"
+    NO_CVE_SAAS_EXCLUDED = "no_cve_saas_excluded"
+    NO_CVE_NOT_AFFECTED = "no_cve_not_affected"
+    NO_CVE_SECRET_HYGIENE = "no_cve_secret_hygiene"
+
+
+class CNAAssessment(BaseModel):
+    decision: CNADecision
+    deployment_mode: DeploymentMode = DeploymentMode.ON_PREM
+    rationale: str = ""
+    split_group: str = ""
+
+
+class ThreatIntelSummary(BaseModel):
+    in_cisa_kev: bool = False
+    kev_date_added: str | None = None
+    epss_score: float | None = None
+    epss_percentile: float | None = None
+    priority_tier: str = "standard"  # emergency_kev | elevated_epss | standard
+
+
 class SBOMComponent(BaseModel):
     name: str
     version: str
@@ -181,6 +210,9 @@ class TriageCase(BaseModel):
     cwe_name: str | None = None
     cwe_rationale: str = ""
     cvss_v4: CVSSv4Assessment | None = None
+    threat_intel: ThreatIntelSummary | None = None
+    cna: CNAAssessment | None = None
+    owning_team: str | None = None
     attack_mappings: list[AttackMapping] = Field(default_factory=list)
     vex: VEXDetermination | None = None
     remediation: RemediationPlan | None = None

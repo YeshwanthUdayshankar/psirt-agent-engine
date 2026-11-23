@@ -15,6 +15,7 @@ from psirt_engine.models.canonical import (
     CVSSv4Assessment,
     EvidenceCitation,
     FindingCategory,
+    ThreatIntelSummary,
     TriageCase,
 )
 
@@ -172,6 +173,17 @@ def run_triage_agent(
             data.get("environmental_rationale") or fallback["environmental_rationale"]
         ),
     )
+
+    # Attach CISA KEV & FIRST EPSS threat intelligence when a CVE ID is present
+    if case.primary_cve_id:
+        kev_epss = intel_service.lookup_kev_epss(case.primary_cve_id)
+        case.threat_intel = ThreatIntelSummary(
+            in_cisa_kev=bool(kev_epss["in_cisa_kev"]),
+            kev_date_added=kev_epss.get("kev_date_added"),
+            epss_score=kev_epss.get("epss_score"),
+            epss_percentile=kev_epss.get("epss_percentile"),
+            priority_tier=str(kev_epss.get("priority_tier", "standard")),
+        )
 
     # Attach ATT&CK mappings from read-only vulnerability intel
     raw_attacks = intel_service.get_attack_mappings_for_cwe(cwe_meta["id"])

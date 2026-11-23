@@ -2,13 +2,16 @@
 
 from __future__ import annotations
 
+import re
 from datetime import UTC, datetime
 from pathlib import Path
+from typing import Any
 
 from psirt_engine.guardrails.cvss_math import verify_cvss4_score
 from psirt_engine.guardrails.schema_validator import validate_artifact_schema
 from psirt_engine.intake.sanitizer import scan_for_secret_leaks
 from psirt_engine.models.canonical import (
+    CNADecision,
     FindingCategory,
     GuardrailIssue,
     GuardrailReport,
@@ -16,6 +19,42 @@ from psirt_engine.models.canonical import (
     TriageCase,
     VEXStatus,
 )
+
+INTERNAL_PROSE_PATTERNS: tuple[tuple[str, re.Pattern[str]], ...] = (
+    ("internal_jira_url", re.compile(r"(?i)https?://[^\s\"']*(?:jira\.internal|\.corp\.|\.internal\b)")),
+    ("local_dev_url", re.compile(r"(?i)https?://(?:localhost|127\.0\.0\.1)(?::\d+)?")),
+    ("local_filesystem_path", re.compile(r"(?:^|[\s`\"'(])(?:/tmp/|/home/[a-zA-Z0-9_.-]+/|/Users/[a-zA-Z0-9_.-]+/)")),
+)
+
+
+def _version_tuple(version_str: str) -> tuple[int, ...]:
+    nums = re.findall(r"\d+", version_str.strip().lstrip("vV"))
+    return tuple(int(n) for n in nums) if nums else (0,)
+
+
+def _version_gt(fixed: str, affected: str) -> bool:
+    tf = _version_tuple(fixed)
+    ta = _version_tuple(affected)
+    max_len = max(len(tf), len(ta))
+    tf = tf + (0,) * (max_len - len(tf))
+    ta = ta + (0,) * (max_len - len(ta))
+    return tf > ta
+
+
+def scan_public_prose_hygiene(obj: Any, path: str = "$") -> list[str]:
+    """Verify no internal URLs, staging hostnames, or local filesystem paths leak into public artifacts."""
+    hits: list[str] = []
+    if isinstance(obj, str):
+        for rule_name, regex in INTERNAL_PROSE_PATTERNS:
+            if regex.search(obj):
+                hits.append(f"{path} matched {rule_name}")
+    elif isinstance(obj, list):
+        for idx, item in enumerate(obj):
+            hits.extend(scan_public_prose_hygiene(item, f"{path}[{idx}]"))
+    elif isinstance(obj, dict):
+        for k, v in obj.items():
+            hits.extend(scan_public_prose_hygiene(v, f"{path}.{k}"))
+    return hits
 
 
 def run_guardrails_for_case(
@@ -235,7 +274,67 @@ def run_guardrails_for_case(
                 )
             )
 
-    # 5. Zero-Leakage Secret Scan across all drafted artifacts & remediation plans
+    # 5. Logical Version Ordering Check (fixed_version must be strictly greater than affected version)
+    if (
+        case.category == FindingCategory.THIRD_PARTY_CVE
+        and case.package_version
+        and case.fixed_version
+        and case.vex
+        and case.vex.status == VEXStatus.AFFECTED
+        and not _version_gt(case.fixed_version, case.package_version)
+    ):
+        issues.append(
+            GuardrailIssue(
+                gate="version_ordering",
+                severity="error",
+                artifact="canonical_state",
+                message=(
+                    f"Fixed version '{case.fixed_version}' is not strictly greater than "
+                    f"affected version '{case.package_version}' for {case.package_name}."
+                ),
+            )
+        )
+
+    # 6. CNA Policy Enforcement (never emit CVE JSON 5.1 unless CNA policy approves new CVE assignment)
+    if (
+        case.cna is not None
+        and case.cna.decision != CNADecision.ASSIGN_NEW_CVE
+        and artifacts.cve_json_5_1 is not None
+    ):
+        issues.append(
+            GuardrailIssue(
+                gate="cna_policy",
+                severity="error",
+                artifact="cve_json_5_1",
+                message=(
+                    f"CVE JSON 5.1 draft must not be generated when CNA decision is "
+                    f"'{case.cna.decision.value}'."
+                ),
+            )
+        )
+
+    # 7. Public Prose Hygiene Check (no internal Jira URLs, localhost, or local filesystem paths)
+    public_targets = {
+        "openvex": artifacts.openvex,
+        "csaf_vex": artifacts.csaf_vex,
+        "csaf_advisory": artifacts.csaf_advisory,
+        "cve_json_5_1": artifacts.cve_json_5_1,
+        "advisory_markdown": artifacts.advisory_markdown,
+    }
+    for art_name, payload in public_targets.items():
+        if payload is None:
+            continue
+        for hit in scan_public_prose_hygiene(payload):
+            issues.append(
+                GuardrailIssue(
+                    gate="public_prose_hygiene",
+                    severity="error",
+                    artifact=art_name,
+                    message=f"Internal URL/path leaked into public disclosure artifact: {hit}",
+                )
+            )
+
+    # 8. Zero-Leakage Secret Scan across all drafted artifacts & remediation plans
     leak_targets = {
         "openvex": artifacts.openvex,
         "csaf_vex": artifacts.csaf_vex,

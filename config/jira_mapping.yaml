@@ -1,0 +1,41 @@
+# Jira Schema-Drift Mapping Configuration
+# Isolates per-division Jira custom field IDs and project keys from the canonical TriageCase model.
+
+default_project:
+  project_key: "PSIRT"
+  issue_type: "Security Vulnerability"
+  priority_map:
+    CRITICAL: "Highest"
+    HIGH: "High"
+    MEDIUM: "Medium"
+    LOW: "Low"
+    NONE: "Lowest"
+  custom_fields:
+    cve_id: "customfield_10201"
+    cwe_id: "customfield_10202"
+    cvss_v4_score: "customfield_10203"
+    cvss_v4_vector: "customfield_10204"
+    vex_status: "customfield_10205"
+    cna_decision: "customfield_10206"
+    cisa_kev: "customfield_10207"
+    epss_score: "customfield_10208"
+    idempotency_key: "customfield_10299"
+
+# Team-specific overrides keyed by CODEOWNERS handle (demonstrating enterprise schema-drift handling)
+team_overrides:
+  "@appsec-backend":
+    project_key: "APPAPI"
+    issue_type: "Bug"
+    custom_fields:
+      cve_id: "customfield_20100"
+      cvss_v4_score: "customfield_20101"
+      vex_status: "customfield_20102"
+      idempotency_key: "customfield_20199"
+  "@platform-infra":
+    project_key: "INFRA"
+    issue_type: "Security Task"
+    custom_fields:
+      cve_id: "customfield_30500"
+      cvss_v4_score: "customfield_30501"
+      vex_status: "customfield_30502"
+      idempotency_key: "customfield_30599"

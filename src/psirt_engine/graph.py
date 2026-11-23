@@ -16,11 +16,13 @@ from langgraph.checkpoint.base import BaseCheckpointSaver
 from langgraph.graph import END, START, StateGraph
 
 from psirt_engine.agents.advisory_agent import run_advisory_agent
+from psirt_engine.agents.cna_rules import evaluate_cna_assignment
 from psirt_engine.agents.remediation_agent import run_remediation_agent
 from psirt_engine.agents.triage_agent import run_triage_agent
 from psirt_engine.agents.vex_agent import run_vex_agent
 from psirt_engine.config import load_cna_profile
 from psirt_engine.guardrails.consistency import run_guardrails_for_case
+from psirt_engine.hitl.jira_adapter import resolve_codeowner
 from psirt_engine.hitl.publishers import publish_approved_bundle
 from psirt_engine.intake.deduplicator import deduplicate_findings
 from psirt_engine.intake.sanitizer import sanitize_findings, scan_repo_for_prompt_injections
@@ -30,6 +32,7 @@ from psirt_engine.mcp_servers.repo_ast_server import RepoASTService
 from psirt_engine.mcp_servers.vuln_intel_server import VulnIntelService
 from psirt_engine.models.audit import DecisionAuditLog
 from psirt_engine.models.canonical import (
+    DeploymentMode,
     FindingCategory,
     SBOMComponent,
     TriageCase,
@@ -144,14 +147,18 @@ def node_agent_triage(state: PSIRTGraphState) -> PSIRTGraphState:
     ast_service = RepoASTService(repo_path)
     intel_service = VulnIntelService()
     llm = ModelAgnosticLLM(profile_name=state.get("model_profile"))
+    dep_mode = DeploymentMode(state.get("deployment_mode") or "on_prem")
 
     cases = _load_cases(state)
     audit = _load_audit(state)
     updated: list[TriageCase] = []
 
     for case in cases:
+        primary_file = case.findings[0].file_path if case.findings else None
+        case.owning_team = resolve_codeowner(repo_path, primary_file)
         case = run_triage_agent(case, ast_service, intel_service, llm)
         case = run_vex_agent(case, ast_service, llm)
+        case.cna = evaluate_cna_assignment(case, deployment_mode=dep_mode)
         updated.append(case)
         audit.append_event(
             actor="agent:triage_and_vex",
@@ -159,7 +166,8 @@ def node_agent_triage(state: PSIRTGraphState) -> PSIRTGraphState:
             case_id=case.case_id,
             summary=(
                 f"{case.case_id}: {case.cwe_id}, CVSS v4.0 {case.cvss_v4.score if case.cvss_v4 else 'n/a'}, "
-                f"VEX={case.vex.status.value if case.vex else 'unknown'} (conf={case.confidence:.2f})"
+                f"VEX={case.vex.status.value if case.vex else 'unknown'}, "
+                f"CNA={case.cna.decision.value}, owner={case.owning_team or 'unassigned'} (conf={case.confidence:.2f})"
             ),
             details={
                 "cwe_id": case.cwe_id,
@@ -168,6 +176,9 @@ def node_agent_triage(state: PSIRTGraphState) -> PSIRTGraphState:
                     case.vex.justification.value if (case.vex and case.vex.justification) else None
                 ),
                 "reachable": case.vex.reachable if case.vex else False,
+                "cna_decision": case.cna.decision.value,
+                "owning_team": case.owning_team,
+                "in_cisa_kev": case.threat_intel.in_cisa_kev if case.threat_intel else False,
             },
         )
 
@@ -217,12 +228,15 @@ def node_remediate(state: PSIRTGraphState) -> PSIRTGraphState:
 def node_draft_artifacts(state: PSIRTGraphState) -> PSIRTGraphState:
     """State 4_DRAFT_ARTIFACTS (OpenVEX, CSAF 2.0, CVE JSON 5.1, Markdown Advisory)."""
     repo_name = Path(state["repo_path"]).resolve().name
+    dep_mode = DeploymentMode(state.get("deployment_mode") or "on_prem")
     cna = load_cna_profile()
     cases = _load_cases(state)
     audit = _load_audit(state)
     updated: list[TriageCase] = []
 
     for case in cases:
+        # Re-evaluate CNA assignment rule cleanly (handles post-override VEX status transitions)
+        case.cna = evaluate_cna_assignment(case, deployment_mode=dep_mode)
         feedback = (
             case.guardrail_report.issues
             if (case.guardrail_report and not case.guardrail_report.passed)
@@ -328,6 +342,7 @@ def node_publish(state: PSIRTGraphState) -> PSIRTGraphState:
         audit_log=audit,
         output_dir=out_dir,
         sbom=state.get("sbom"),
+        run_id=state.get("run_id", "run-default"),
     )
     return {
         "current_stage": "7_PUBLISHED",

@@ -162,6 +162,52 @@ VEX_JUSTIFICATION_DOCS: dict[str, str] = {
     "inline_mitigations_already_exist": "Existing inline input validation, guards, or configurations fully prevent exploitation.",
 }
 
+# Curated offline CISA KEV & FIRST EPSS catalog (augmented via live FIRST EPSS API when PSIRT_ALLOW_ONLINE_INTEL=1)
+KEV_EPSS_CATALOG: dict[str, dict[str, Any]] = {
+    "CVE-2023-44487": {
+        "in_cisa_kev": True,
+        "kev_date_added": "2023-10-10",
+        "epss_score": 0.943,
+        "epss_percentile": 0.996,
+    },
+    "CVE-2020-14343": {
+        "in_cisa_kev": False,
+        "kev_date_added": None,
+        "epss_score": 0.892,
+        "epss_percentile": 0.985,
+    },
+    "CVE-2023-50447": {
+        "in_cisa_kev": False,
+        "kev_date_added": None,
+        "epss_score": 0.412,
+        "epss_percentile": 0.921,
+    },
+    "CVE-2024-45337": {
+        "in_cisa_kev": False,
+        "kev_date_added": None,
+        "epss_score": 0.315,
+        "epss_percentile": 0.901,
+    },
+    "CVE-2023-32681": {
+        "in_cisa_kev": False,
+        "kev_date_added": None,
+        "epss_score": 0.048,
+        "epss_percentile": 0.742,
+    },
+    "CVE-2024-34064": {
+        "in_cisa_kev": False,
+        "kev_date_added": None,
+        "epss_score": 0.014,
+        "epss_percentile": 0.512,
+    },
+    "CVE-2023-45803": {
+        "in_cisa_kev": False,
+        "kev_date_added": None,
+        "epss_score": 0.008,
+        "epss_percentile": 0.391,
+    },
+}
+
 
 class VulnIntelService:
     """Read-only threat & vulnerability intelligence lookup service."""
@@ -191,6 +237,40 @@ class VulnIntelService:
 
     def list_vex_justifications(self) -> dict[str, str]:
         return dict(VEX_JUSTIFICATION_DOCS)
+
+    def lookup_kev_epss(self, cve_id: str) -> dict[str, Any]:
+        """Look up CISA KEV membership and FIRST EPSS exploitation probability (read-only)."""
+        norm = cve_id.upper().strip()
+        if norm in KEV_EPSS_CATALOG:
+            entry = dict(KEV_EPSS_CATALOG[norm])
+        else:
+            entry = {
+                "in_cisa_kev": False,
+                "kev_date_added": None,
+                "epss_score": None,
+                "epss_percentile": None,
+            }
+            if os.environ.get("PSIRT_ALLOW_ONLINE_INTEL") == "1" and norm.startswith("CVE-"):
+                try:
+                    with httpx.Client(timeout=10) as client:
+                        resp = client.get(f"https://api.first.org/data/v1/epss?cve={norm}")
+                        if resp.status_code == 200:
+                            rows = resp.json().get("data") or []
+                            if rows:
+                                entry["epss_score"] = round(float(rows[0]["epss"]), 4)
+                                entry["epss_percentile"] = round(float(rows[0]["percentile"]), 4)
+                except (httpx.HTTPError, KeyError, ValueError):
+                    pass
+
+        if entry["in_cisa_kev"]:
+            tier = "emergency_kev"
+        elif (entry["epss_score"] or 0.0) >= 0.50:
+            tier = "elevated_epss"
+        else:
+            tier = "standard"
+        entry["priority_tier"] = tier
+        entry["cve_id"] = norm
+        return entry
 
     def lookup_osv_advisory(self, vuln_id: str) -> dict[str, Any]:
         """Optional read-only OSV lookup when PSIRT_ALLOW_ONLINE_INTEL=1; offline safe by default."""
@@ -228,6 +308,11 @@ def create_vuln_intel_mcp_server() -> FastMCP:
     def list_vex_justifications() -> dict[str, str]:
         """List official OpenVEX / CSAF 2.0 not_affected justification codes (read-only)."""
         return service.list_vex_justifications()
+
+    @mcp.tool()
+    def lookup_kev_epss(cve_id: str) -> dict[str, Any]:
+        """Look up CISA KEV status and FIRST EPSS score for a CVE identifier (read-only)."""
+        return service.lookup_kev_epss(cve_id)
 
     @mcp.tool()
     def lookup_osv_advisory(vuln_id: str) -> dict[str, Any]:

@@ -1,6 +1,8 @@
 # Agentic PSIRT & Vulnerability Response Engine (`psirt-agent-engine`)
 
-An open-source, multi-agent Product Security Incident Response (PSIRT) & Vulnerability Response Engine built with **Zero-Trust Separation of Duties**, **Read-Only Tree-sitter AST MCP Tools**, **Deterministic Guardrails**, and **Mandatory Human-in-the-Loop (HITL) Approval Gates**.
+[![CI](https://github.com/YeshwanthUdayshankar/psirt-agent-engine/actions/workflows/ci.yml/badge.svg)](https://github.com/YeshwanthUdayshankar/psirt-agent-engine/actions/workflows/ci.yml)
+
+An open-source, multi-agent Product Security Incident Response (PSIRT) & Vulnerability Response Engine built with **Zero-Trust Separation of Duties**, **Read-Only Tree-sitter AST MCP Tools**, **CVE Program CNA Counting Rules**, **CISA KEV/EPSS Threat Intel**, **Deterministic Guardrails**, and **Mandatory Human-in-the-Loop (HITL) Approval Gates**.
 
 ## Why This Exists
 
@@ -77,7 +79,8 @@ bash scripts/install-tools.sh
 
 ```bash
 # Step 1: Scan & triage target repo — halts automatically at 6_AWAITING_HUMAN_REVIEW
-psirt-engine scan tests/fixtures/sample_python_app --profile ollama_local
+# Supports --deployment-mode on_prem | hybrid | saas (enforces CVE Program CNA SaaS rules)
+psirt-engine scan tests/fixtures/sample_python_app --profile ollama_local --deployment-mode on_prem
 
 # Step 2: Check status & metrics (Noise Reduction Rate, Schema Pass Rate, Redactions)
 psirt-engine status
@@ -85,7 +88,7 @@ psirt-engine status
 # Step 3: Interactive Rich TUI review (inspect citations/diffs, override VEX, approve)
 psirt-engine review --reviewer psirt-engineer
 
-# Or approve non-interactively and export the validated disclosure bundle:
+# Or approve non-interactively and export the validated disclosure bundle + Jira payloads:
 psirt-engine approve --reviewer psirt-engineer --export
 ```
 
@@ -104,14 +107,22 @@ Both MCP servers expose strictly read-only tools (zero file write, shell executi
 # Repository Tree-sitter AST & sanitized file reader MCP server
 PSIRT_TARGET_REPO=./tests/fixtures/sample_python_app psirt-mcp-repo-ast
 
-# Vulnerability Intelligence (CWE / MITRE ATT&CK / VEX / OSV) MCP server
+# Vulnerability Intelligence (CWE / MITRE ATT&CK / CISA KEV / EPSS / VEX / OSV) MCP server
 psirt-mcp-vuln-intel
 ```
 
-### 5. Run Tests
+### 5. Enterprise PSIRT Governance Features
+
+- **CNA Assignment Rules (`--deployment-mode on_prem|hybrid|saas`):** Enforces CVE Program Section 7 rules — references upstream CVEs for third-party deps, excludes vendor-managed multi-tenant SaaS flaws requiring zero customer action, and splits first-party on-prem/hybrid root causes into schema-valid CVE JSON 5.1 drafts.
+- **CISA KEV & FIRST EPSS Enrichment:** Layers exploitation likelihood and active-exploitation status (`emergency_kev` / `elevated_epss` / `standard`) alongside environmental CVSS v4.0.
+- **Jira Schema-Drift Adapter & `CODEOWNERS` Routing (`config/jira_mapping.yaml`):** Automatically resolves owning teams from `CODEOWNERS`, maps canonical cases into division-specific Jira custom field IDs with deterministic idempotency keys, exports `jira_tickets.json` dry-run payloads, and supports HTTP `429` exponential backoff.
+- **`Advisory-Ready` Hygiene Guardrails:** Deterministically verifies `fixed_version > affected_version`, blocks internal URLs/hostnames (`jira.internal`, `localhost`, `/tmp/...`) from leaking into public advisories, and enforces CNA policy compliance before HITL sign-off.
+
+### 6. Run Tests & Golden-Dataset Evaluation Benchmark
 
 ```bash
 pytest -v
+python scripts/run_eval.py
 ```
 
 ---

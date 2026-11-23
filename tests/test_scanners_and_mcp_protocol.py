@@ -165,9 +165,16 @@ async def test_mcp_protocol_list_and_call_tools_end_to_end():
 
     # Invoke vuln_intel MCP tools through protocol
     intel_tools = await intel_mcp.list_tools()
-    assert {"lookup_cwe", "lookup_attack", "get_attack_mappings_for_cwe", "list_vex_justifications", "lookup_osv_advisory"} == {
-        t.name for t in intel_tools
-    }
+    assert {
+        "lookup_cwe",
+        "lookup_attack",
+        "get_attack_mappings_for_cwe",
+        "list_vex_justifications",
+        "lookup_kev_epss",
+        "lookup_osv_advisory",
+    } == {t.name for t in intel_tools}
+    kev_res = await intel_mcp.call_tool("lookup_kev_epss", {"cve_id": "CVE-2023-44487"})
+    assert "emergency_kev" in str(kev_res)
     cwe_res = await intel_mcp.call_tool("lookup_cwe", {"cwe_id": "CWE-502"})
     assert "Deserialization" in str(cwe_res)
     just_res = await intel_mcp.call_tool("list_vex_justifications", {})

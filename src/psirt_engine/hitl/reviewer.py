@@ -40,8 +40,9 @@ def render_cases_summary_table(cases: list[TriageCase], console: Console | None 
     table.add_column("CVE / Category", style="magenta")
     table.add_column("CWE", style="yellow")
     table.add_column("CVSS v4.0", justify="right")
+    table.add_column("KEV/EPSS")
     table.add_column("VEX Status", style="bold")
-    table.add_column("Conf", justify="right")
+    table.add_column("CNA / Owner")
     table.add_column("Guardrails")
     table.add_column("Approved")
 
@@ -49,6 +50,18 @@ def render_cases_summary_table(cases: list[TriageCase], console: Console | None 
         vex_status = c.vex.status.value if c.vex else "pending"
         vex_style = "red" if vex_status == "affected" else "green"
         cvss_str = f"{c.cvss_v4.score:.1f} ({c.cvss_v4.severity})" if c.cvss_v4 else "N/A"
+        if c.threat_intel:
+            kev_tag = "[bold red]KEV[/bold red]" if c.threat_intel.in_cisa_kev else "no"
+            epss_tag = (
+                f"{c.threat_intel.epss_score:.2f}"
+                if c.threat_intel.epss_score is not None
+                else "-"
+            )
+            intel_str = f"{kev_tag}/{epss_tag}"
+        else:
+            intel_str = "-"
+        cna_tag = c.cna.decision.value if c.cna else "-"
+        owner_tag = c.owning_team or "-"
         gr_str = (
             "[green]PASS[/green]"
             if (c.guardrail_report and c.guardrail_report.passed)
@@ -60,8 +73,9 @@ def render_cases_summary_table(cases: list[TriageCase], console: Console | None 
             c.primary_cve_id or c.category.value,
             c.cwe_id or "-",
             cvss_str,
+            intel_str,
             f"[{vex_style}]{vex_status}[/{vex_style}]",
-            f"{c.confidence:.2f}",
+            f"{cna_tag} ({owner_tag})",
             gr_str,
             appr,
         )
@@ -267,13 +281,21 @@ def generate_pr_review_comment(
         f"- **Run ID:** `{run_id}` | **Commit:** `{commit_sha[:12]}`",
         f"- **Cases:** `{len(cases)}` | **Noise Reduction Rate:** `{metrics.get('noise_reduction_rate_pct', 0):.1f}%` | **Schema Pass Rate:** `{metrics.get('schema_pass_rate_pct', 0):.1f}%`",
         "",
-        "| Case ID | CVE / Category | CWE | CVSS v4.0 | VEX Status | Confidence | Guardrails | Primary Citation |",
-        "|---|---|---|---|---|---:|---|---|",
+        "| Case ID | CVE / Category | CWE | CVSS v4.0 | KEV / EPSS | VEX Status | CNA Decision | Owner | Guardrails | Primary Citation |",
+        "|---|---|---|---|---|---|---|---|---|---|",
     ]
     for c in cases:
         vex_status = c.vex.status.value if c.vex else "pending"
         just = f" (`{c.vex.justification.value}`)" if (c.vex and c.vex.justification) else ""
         cvss = f"`{c.cvss_v4.score}` ({c.cvss_v4.severity})" if c.cvss_v4 else "N/A"
+        if c.threat_intel:
+            kev_s = "**YES**" if c.threat_intel.in_cisa_kev else "no"
+            epss_s = f"{c.threat_intel.epss_score:.2f}" if c.threat_intel.epss_score is not None else "-"
+            intel_s = f"{kev_s} / `{epss_s}`"
+        else:
+            intel_s = "-"
+        cna_s = f"`{c.cna.decision.value}`" if c.cna else "-"
+        owner_s = f"`{c.owning_team}`" if c.owning_team else "-"
         gr = "PASS" if (c.guardrail_report and c.guardrail_report.passed) else "NEEDS_MANUAL_TRIAGE"
         cit = (
             f"`{c.citations[0].file_path}:{c.citations[0].line_start}`"
@@ -282,7 +304,7 @@ def generate_pr_review_comment(
         )
         lines.append(
             f"| `{c.case_id}` | `{c.primary_cve_id or c.category.value}` | `{c.cwe_id or '-'}` "
-            f"| {cvss} | `{vex_status}`{just} | {c.confidence:.2f} | {gr} | {cit} |"
+            f"| {cvss} | {intel_s} | `{vex_status}`{just} | {cna_s} | {owner_s} | {gr} | {cit} |"
         )
 
     lines.extend(

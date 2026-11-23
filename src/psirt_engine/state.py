@@ -14,6 +14,7 @@ class PSIRTGraphState(TypedDict, total=False):
     repo_path: str
     commit_sha: str
     model_profile: str
+    deployment_mode: str  # on_prem | hybrid | saas
     output_dir: str
     extra_scanner_reports: list[str]
     prefer_builtin_scanners: bool
