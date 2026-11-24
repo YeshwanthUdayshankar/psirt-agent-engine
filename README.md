@@ -109,6 +109,24 @@ python scripts/run_eval.py
 
 ---
 
+## Install as Standalone Agent Skills (Claude Code · Cursor · Copilot · MCP)
+
+Prefer drop-in `SKILL.md` packages inside **Claude Code**, **Cursor**, **GitHub Copilot**, or 20+ other AI coding agents instead of deploying the full Python CLI?
+
+The deterministic guardrails, AST reachability analyzer, CNA rules, CVSS v4.0/KEV/EPSS prioritizer, and Jira `CODEOWNERS` router from this engine are available as standalone, zero-network skills on **[Agensi.io](https://www.agensi.io/r/YESHWANTHUDAYSHA)**:
+
+| Skill | Pricing | What It Adds to Your Agent |
+|---|---|---|
+| **[PSIRT Advisory Hygiene & Zero-Leakage Gate](https://agensi.io/skills/psirt-advisory-hygiene-zero-leakage-gate)** | **Free** | Blocks 14 secret/PII patterns, internal URLs (`jira.internal`, `localhost`, `/tmp/`), and indirect prompt injections before publishing advisories or PRs |
+| **[VEX Reachability Analyst (AST + OpenVEX v0.2.0)](https://agensi.io/skills/vex-reachability-analyst-ast-call-graph-openvex-v0-2-0)** | **$9** | Static Python/Go AST call-graph reachability with monorepo `--scope-dir` + schema-validated OpenVEX v0.2.0 output |
+| **[CNA Disclosure Kit (CVE 5.1, CSAF 2.0 & OpenVEX)](https://agensi.io/skills/cna-disclosure-kit-cve-json-5-1-oasis-csaf-2-0-openvex)** | **$12** | Enforces CVE Program Section 7 CNA rules (`on_prem` vs. `saas` vs. 3rd-party) with vendored schemas and a 6-gate bundle validator |
+| **[CVSS v4.0, CISA KEV & EPSS Risk Prioritizer](https://agensi.io/skills/cvss-v4-0-cisa-kev-epss-risk-prioritizer)** | **$9** | Deterministic CVSS v4.0 calculator, CVE 5.1 `cvssV4_0` expander, CISA KEV/EPSS tiering, and MITRE CWE-to-ATT&CK mapping |
+| **[PSIRT Tiered Remediation, Reproducer & Jira Kit](https://agensi.io/skills/psirt-tiered-remediation-reproducer-harness-jira-routing-kit)** | **$9** | Track A/B remediation playbooks, `pytest`/Go reproducers, and `CODEOWNERS`-routed Jira payloads with SHA-256 idempotency keys |
+
+> **Get started on Agensi:** [Browse & install the PSIRT skill suite via Agensi](https://www.agensi.io/r/YESHWANTHUDAYSHA) (start with the free **Advisory Hygiene Gate**).
+
+---
+
 ## Core Enterprise PSIRT Features
 
 | Capability | Implementation |
