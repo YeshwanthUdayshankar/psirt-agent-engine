@@ -411,5 +411,6 @@ events:
 ## Documentation
 
 - **[Detailed Features, Architecture & Setup Guide](docs/DETAILED_GUIDE.md)** — Complete technical reference covering every layer, CNA rules, MCP servers, Jira integration, 8 guardrail gates, LLM profiles, CLI flags, CI/CD setup, and troubleshooting.
+- **[Guardrails Reference (Three-Ring Defense with Examples)](docs/GUARDRAILS.md)** — Concrete bad/good examples and error outputs for every preventive, Layer 3 deterministic, and Layer 4 publication guardrail.
 - **[Deep-Dive Study Guide](docs/STUDY_GUIDE.md)** — 9-module conceptual & architectural breakdown of PSIRT operations, CNA counting rules, CVSS v4.0/KEV/EPSS, OpenVEX/CSAF 2.0/CVE 5.1, Tree-sitter AST, LangGraph HITL, MCP security, and trade-offs.
 - **[Hands-On Labs & Panel Interview Drills](docs/HANDS_ON_LABS.md)** — 4 runnable local labs with verified outputs and panel-style Q&As covering CNA rules, AST reachability, prompt injection, guardrails, audit tamper detection, and Jira schema-drift.
